@@ -1,45 +1,56 @@
 pipeline {
+
   environment {
+    // แก้เป็นตัวเล็ก และใช้ขีดกลาง (-) แทน Underscore (_)
     VERCEL_PROJECT_NAME = 'simple-nodejs'
     VERCEL_TOKEN = credentials('devops15-vercel-token')
-  }
-  agent {
+}
+  
+   agent {
     kubernetes {
+      // This YAML defines the "Docker Container" you want to use
       yaml '''
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: my-builder
-    image: node:20-alpine
-    command:
-    - cat
-    tty: true
-'''
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+          - name: my-builder  # We will refer to this name later
+            image: node:20-alpine
+            command:
+            - cat
+            tty: true
+      '''
     }
   }
   stages {
-    stage('Check Node') {
+    stage('Test npm') {
       steps {
         container('my-builder') {
-          sh 'node -v'
-          sh 'npm -v'
+          sh 'npm --version'
+          sh 'node --version'
         }
       }
     }
-
-    stage('Install Dependencies') {
+    stage('Build') {
       steps {
         container('my-builder') {
           sh 'npm ci'
+          //sh 'npm run build'
         }
       }
     }
-
-    stage('Deploy to Vercel') {
+    stage('Test Build') {
+      steps {
+        container('my-builder') {
+          sh 'npm run test'
+        }
+      }
+    }
+    stage('Deploy') {
       steps {
         container('my-builder') {
           sh 'npm install -g vercel@latest'
+          // Deploy using token-only (non-interactive)
           sh '''
             vercel link --project $VERCEL_PROJECT_NAME --token $VERCEL_TOKEN --yes
             vercel --token $VERCEL_TOKEN --prod --confirm
@@ -47,5 +58,6 @@ spec:
         }
       }
     }
+ 
   }
 }
